@@ -1,14 +1,23 @@
 import math
+import time
+
+import openpyxl
 import pandas as pd
 import requests
 from yandex_geocoder import Client
-import time
 
 points = pd.read_excel('DataSet.xlsx', sheet_name='Входные данные для анализа', usecols=range(7))
 points.dropna(inplace=True)
 
 
 def set_task(point):
+    """
+    Установка для каждой задачи приоритета
+
+    :param point: задача
+    :return: приоритет: 1-высокий, 2-средний, 3-низкий
+    """
+
     if point["Когда подключена точка?"] == "вчера" or point["Карты и материалы доставлены?"] == "нет":
         return 3
     elif point['Кол-во выданных карт'] / point['Кол-во одобренных заявок'] <= 0.5:
@@ -23,13 +32,21 @@ def set_task(point):
 points["№ Задачи"] = points.apply(set_task, axis=1)
 points.sort_values(by='№ Задачи', inplace=True)
 
-client = Client("22900526-289d-40ca-8382-6c3a2282e733")  # Yandex api key
-token = '5b3ce3597851110001cf6248c6536c473ace4987b80c93db6693db1c'  # OpenRouteService Api Key
+client = Client("")  # Yandex api key
+token = ''  # OpenRouteService Api Key
 
 cnt = 0
 
 
 def matrix(address: list[str, str], profile=0):
+    """
+    Расчёт времени между адресами
+
+    :param address: 2 адреса
+    :param profile: 0 - на машине; 1 - пешком
+    :return: durations
+    """
+
     global cnt
     coord_1 = client.coordinates(address[0])
     coord_2 = client.coordinates(address[1])
@@ -63,6 +80,13 @@ centres = employees["Адрес локации"].unique()
 
 
 def set_grade(employee_grade):
+    """
+    Установка каждому сотруднику списка приоритетов (для джуна [3] и так далее)
+
+    :param employee_grade: сотрудник
+    :return: список приоритетов, который сотрудник может выполнить
+    """
+
     match employee_grade:
         case "Синьор":
             return [1, 2, 3]
@@ -79,10 +103,16 @@ employees["Номера взятых задач"] = employees["Кол-во от�
 points_tomorrow = {
     key: [] for key in points.columns
 }
-points_tomorrow = pd.DataFrame(points_tomorrow)
+points_tomorrow = pd.DataFrame(points_tomorrow) # Создание датафрейма, с задачами которые не успели сегодня
 
 
 def distribute_tasks():
+    """
+    Самая главная функция, выполняющая распределение задач между сотрудниками
+
+    :return: заполненный dataframe employees и points_tomorrow
+    """
+
     global points_tomorrow
     for index, point in points.iterrows():
         task_number = point['№ Задачи']
@@ -141,4 +171,7 @@ def distribute_tasks():
 
 
 distribute_tasks()
-print('Hello world')
+
+# Вывод
+points_tomorrow.to_csv('points_tomorrow.csv')
+employees[['ФИО', "Номера взятых задач"]].to_excel('employees.xlsx')
