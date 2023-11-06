@@ -2,6 +2,7 @@ import math
 import pandas as pd
 import requests
 from yandex_geocoder import Client
+import time
 
 points = pd.read_excel('DataSet.xlsx', sheet_name='Входные данные для анализа', usecols=range(7))
 points.dropna(inplace=True)
@@ -22,11 +23,14 @@ def set_task(point):
 points["№ Задачи"] = points.apply(set_task, axis=1)
 points.sort_values(by='№ Задачи', inplace=True)
 
-client = Client("")     #Yandex api key
-token = ''              #OpenRouteService Api Key
+client = Client("22900526-289d-40ca-8382-6c3a2282e733")  # Yandex api key
+token = '5b3ce3597851110001cf6248c6536c473ace4987b80c93db6693db1c'  # OpenRouteService Api Key
+
+cnt = 0
 
 
 def matrix(address: list[str, str], profile=0):
+    global cnt
     coord_1 = client.coordinates(address[0])
     coord_2 = client.coordinates(address[1])
 
@@ -46,6 +50,10 @@ def matrix(address: list[str, str], profile=0):
                         headers=headers,
                         json=data).json()
     ps = dict(durations=res['durations'][0][1], distances=res['distances'][0][1])
+
+    cnt += 1
+    if cnt == 40:
+        time.sleep(60)
 
     return math.ceil(ps["durations"] / 60)
 
@@ -98,21 +106,21 @@ def distribute_tasks():
 
         if task_number == 3:
             junior = suitable_employees[suitable_employees["Грейд"] == "Джун"]
-            if junior[junior['Кол-во отработанных минут'] >= 480]['ФИО'].sum() < len(junior):
+            if junior[junior['Кол-во отработанных минут'] >= 450]['ФИО'].count() < len(junior):
                 suitable_employees = junior
             else:
                 suitable_employees = suitable_employees[suitable_employees["Грейд"] != "Джун"]
 
         elif task_number == 2:
             middle = suitable_employees[suitable_employees["Грейд"] == "Мидл"]
-            if middle[middle['Кол-во отработанных минут'] >= 480]['ФИО'].sum() < len(middle):
+            if middle[middle['Кол-во отработанных минут'] >= 420]['ФИО'].count() < len(middle) - 1:
                 suitable_employees = middle
             else:
-                suitable_employees = suitable_employees[suitable_employees["Грейд"] == "Синьор"]
+                suitable_employees = suitable_employees[suitable_employees["Грейд"] != "Джун"]
 
         for e_index, employee in suitable_employees.iterrows():
 
-            if employee["Кол-во отработанных минут"] + task_time >= 480:
+            if employee["Кол-во отработанных минут"] + task_time >= 540:
                 continue
 
             destination = employee["Адрес локации"]
@@ -130,3 +138,7 @@ def distribute_tasks():
             employees.loc[best_employee_id, "Кол-во отработанных минут"] += best_travel_time + task_time
             employees.loc[best_employee_id, "Номера взятых задач"].append(index)
             employees.loc[best_employee_id, "Адрес локации"] = origin
+
+
+distribute_tasks()
+print('Hello world')
